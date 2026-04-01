@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Particle Life — MyTagSpot</title>
+    <meta name="description" content="Particle Life: een wetenschappelijke simulatie van emergent gedrag uit simpele wiskundige interactieregels. 6 fysica modellen, zero dependencies.">
+    <meta property="og:title" content="Particle Life — Wetenschappelijke Simulatie">
+    <meta property="og:description" content="6 wiskundige modellen: Lennard-Jones, Morse, Yukawa, Coulomb, Vortex, Spring-Damper. Zero dependencies.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #060610;
+            --panel-bg: #0a0a16;
+            --panel-border: #161628;
+            --card-bg: #0e0e1c;
+            --text: #d8d8e8;
+            --text-muted: #4a4a68;
+            --accent: #269dc1;
+            --accent2: #7c4dff;
+            --green: #4cff8a;
+            --red: #ff4070;
+            --yellow: #ffe040;
+            --slider-track: #1a1a30;
+            --btn-bg: #10102a;
+            --btn-hover: #181840;
+            --panel-width: 380px;
+            --header-h: 40px;
+            --mono: 'JetBrains Mono', monospace;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            user-select: none;
+        }
+
+        /* HEADER */
+        .header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--header-h);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            background: rgba(6,6,16,0.92);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--panel-border);
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 10px; }
+
+        .header-title {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background: linear-gradient(135deg, #00e5ff, #7c4dff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 600;
+            font-family: var(--mono);
+            color: var(--green);
+            border: 1px solid rgba(76,255,138,0.2);
+            background: rgba(76,255,138,0.05);
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+
+        .header-right { display: flex; align-items: center; gap: 8px; }
+
+        .header-stat {
+            font-size: 10px;
+            font-family: var(--mono);
+            color: var(--text-muted);
+        }
+
+        .header-stat b { color: var(--text); font-weight: 500; }
+
+        .menu-btn {
+            display: none;
+            background: none;
+            border: 1px solid var(--panel-border);
+            color: var(--text);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        /* CANVAS */
+        .canvas-wrap {
+            position: fixed;
+            top: var(--header-h);
+            left: 0;
+        }
+
+        .canvas-wrap canvas {
+            position: absolute;
+            top: 0; left: 0;
+        }
+
+        #bgCanvas { z-index: 1; }
+        #simCanvas { z-index: 2; }
+        #fxCanvas { z-index: 3; pointer-events: none; }
+        #uiCanvas { z-index: 4; pointer-events: none; }
+
+        /* PANEL */
+        .panel {
+            position: fixed;
+            top: var(--header-h);
+            right: 0;
+            width: var(--panel-width);
+            height: calc(100vh - var(--header-h));
+            background: var(--panel-bg);
+            border-left: 1px solid var(--panel-border);
+            overflow-y: auto;
+            overflow-x: hidden;
+            z-index: 90;
+            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        .panel::-webkit-scrollbar { width: 3px; }
+        .panel::-webkit-scrollbar-track { background: transparent; }
+        .panel::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
+
+        .section { padding: 12px 14px; border-bottom: 1px solid var(--panel-border); }
+
+        .section-head {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.8px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .section-head .dot {
+            width: 4px; height: 4px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        /* FORMULE BOX */
+        .formula-box {
+            background: var(--card-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--accent);
+            line-height: 1.8;
+            letter-spacing: 0.3px;
+        }
+
+        .formula-box .label {
+            font-family: 'Inter', sans-serif;
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .formula-box .var-green { color: var(--green); }
+        .formula-box .var-red { color: var(--red); }
+        .formula-box .var-yellow { color: var(--yellow); }
+
+        /* CONTROLS */
+        .ctrl {
+            display: flex;
+            align-items: center;
+            margin-bottom: 7px;
+        }
+
+        .ctrl-label {
+            font-size: 11px;
+            color: var(--text);
+            width: 80px;
+            flex-shrink: 0;
+        }
+
+        .ctrl-val {
+            font-size: 10px;
+            font-family: var(--mono);
+            color: var(--text-muted);
+            width: 36px;
+            text-align: right;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            flex: 1;
+            height: 3px;
+            background: var(--slider-track);
+            border-radius: 2px;
+            outline: none;
+            margin: 0 6px;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px; height: 10px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 6px rgba(38,157,193,0.4);
+        }
+
+        select {
+            background: var(--btn-bg);
+            color: var(--text);
+            border: 1px solid var(--panel-border);
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: inherit;
+            width: 100%;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            background: var(--btn-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--text);
+            font-size: 11px;
+            font-family: inherit;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn:hover { background: var(--btn-hover); border-color: var(--accent); }
+        .btn:active { transform: scale(0.96); }
+
+        .btn-glow {
+            background: rgba(38,157,193,0.1);
+            border-color: rgba(38,157,193,0.3);
+            color: var(--accent);
+        }
+
+        .btn-row { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 6px; }
+        .btn-row .btn { flex: 1; }
+
+        /* TOGGLE */
+        .tog { display: flex; align-items: center; margin-bottom: 7px; }
+
+        .tog-switch {
+            position: relative;
+            width: 30px; height: 16px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .tog-switch input { opacity: 0; width: 0; height: 0; }
+
+        .tog-track {
+            position: absolute; inset: 0;
+            background: var(--slider-track);
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+
+        .tog-track::after {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px;
+            width: 12px; height: 12px;
+            background: #444;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .tog-switch input:checked + .tog-track { background: rgba(38,157,193,0.3); }
+
+        .tog-switch input:checked + .tog-track::after {
+            transform: translateX(14px);
+            background: var(--accent);
+        }
+
+        /* MATRIX */
+        .matrix { display: flex; flex-direction: column; gap: 1px; }
+
+        .matrix-hdr { display: flex; gap: 1px; padding-left: 20px; }
+
+        .matrix-hdr-cell {
+            width: 36px; height: 14px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .cdot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            box-shadow: 0 0 3px currentColor;
+        }
+
+        .matrix-row { display: flex; align-items: center; gap: 1px; }
+
+        .matrix-rl {
+            width: 18px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .matrix-cell {
+            width: 36px; height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 600;
+            font-family: var(--mono);
+            cursor: pointer;
+            transition: all 0.12s;
+            border: 1px solid transparent;
+        }
+
+        .matrix-cell:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.2); z-index: 2; }
+
+        /* CHARTS */
+        .chart-wrap {
+            background: var(--card-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+
+        .chart-label {
+            font-size: 9px;
+            font-family: var(--mono);
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .chart-label b { color: var(--text); font-weight: 500; }
+
+        .chart-canvas { width: 100%; height: 50px; display: block; border-radius: 3px; }
+
+        /* LIVE STATS */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 5px;
+            padding: 8px 10px;
+        }
+
+        .stat-card .stat-label {
+            font-size: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .stat-card .stat-val {
+            font-size: 14px;
+            font-family: var(--mono);
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        /* MODEL PARAMS visibility */
+        .mp-lj, .mp-morse, .mp-yukawa, .mp-coulomb, .mp-vortex, .mp-spring { display: none; }
+        [data-model="lennard-jones"] .mp-lj { display: flex; }
+        [data-model="morse"] .mp-morse { display: flex; }
+        [data-model="morse"] .mp-lj:not(.mp-morse) { display: none; }
+        [data-model="yukawa"] .mp-yukawa { display: flex; }
+        [data-model="coulomb"] .mp-coulomb { display: flex; }
+        [data-model="vortex"] .mp-vortex { display: flex; }
+        [data-model="spring"] .mp-spring { display: flex; }
+
+        /* HINT */
+        .hint {
+            position: fixed;
+            bottom: 8px; left: 8px;
+            font-size: 10px;
+            font-family: var(--mono);
+            color: var(--text-muted);
+            opacity: 0.4;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        /* FOOTER */
+        .footer { padding: 12px 14px; text-align: center; }
+
+        .footer a { color: var(--accent); text-decoration: none; }
+
+        .footer-brand { font-size: 11px; color: var(--text-muted); }
+
+        .footer-sub {
+            font-size: 8px;
+            font-family: var(--mono);
+            color: var(--text-muted);
+            opacity: 0.4;
+            margin-top: 3px;
+            letter-spacing: 0.5px;
+        }
+
+        /* MOBILE */
+        @media (max-width: 840px) {
+            .menu-btn { display: block; }
+            .badge, .header-stat { display: none; }
+            .hint { display: none; }
+
+            .panel {
+                transform: translateX(100%);
+                width: 320px;
+                box-shadow: -8px 0 30px rgba(0,0,0,0.8);
+            }
+
+            .panel.open { transform: translateX(0); }
+        }
+
+        .overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 85;
+            display: none;
+        }
+
+        .overlay.vis { display: block; }
+    </style>
+</head>
+<body>
+
+<header class="header">
+    <div class="header-left">
+        <span class="header-title">Particle Life</span>
+        <span class="badge">&Sigma; Particle Life</span>
+    </div>
+    <div class="header-right">
+        <span class="header-stat" id="hStat1"></span>
+        <span class="header-stat" id="hStat2"></span>
+        <span class="header-stat" id="hFps">-- fps</span>
+        <button class="menu-btn" id="menuBtn">&#9776;</button>
+    </div>
+</header>
+
+<div class="canvas-wrap" id="cWrap">
+    <canvas id="bgCanvas"></canvas>
+    <canvas id="simCanvas"></canvas>
+    <canvas id="fxCanvas"></canvas>
+    <canvas id="uiCanvas"></canvas>
+</div>
+
+<div class="hint">LMB aantrekken &middot; RMB afstoten &middot; Scroll puls &middot; Spatie pauze &middot; R random &middot; F fullscreen</div>
+
+<div class="overlay" id="ov"></div>
+
+<aside class="panel" id="panel">
+
+    <!-- MODEL SELECTOR -->
+    <div class="section">
+        <div class="section-head"><span class="dot"></span>Wiskundig Model</div>
+        <select id="modelSel">
+            <option value="lennard-jones">Lennard-Jones Potentiaal</option>
+            <option value="morse">Morse Potentiaal</option>
+            <option value="yukawa">Yukawa Potentiaal</option>
+            <option value="coulomb">Coulomb (Afgeschermd)</option>
+            <option value="vortex">Vortex Krachten</option>
+            <option value="spring">Spring-Damper</option>
+        </select>
+        <div class="formula-box" id="formulaBox">
+            <div class="label" id="formulaLabel">Lennard-Jones Interactie</div>
+            <div id="formulaText">
+                F(r) = <span class="var-green">&alpha;</span><sub>ij</sub> &middot; [(<span class="var-yellow">&sigma;</span>/r)<sup>6</sup> &minus; (<span class="var-yellow">&sigma;</span>/r)<sup>3</sup>]<br>
+                <span class="var-green">&alpha;</span> = interactiesterkte &nbsp; <span class="var-yellow">&sigma;</span> = evenwichtsafstand
+            </div>
+        </div>
+    </div>
+
+    <!-- MODEL-SPECIFIEKE PARAMETERS -->
+    <div class="section" id="modelParams">
+        <div class="section-head"><span class="dot"></span>Model Parameters</div>
+        <div class="ctrl mp-lj mp-morse mp-spring">
+            <span class="ctrl-label">&sigma; (eq.dist)</span>
+            <input type="range" id="sSig" min="5" max="40" value="15" step="1">
+            <span class="ctrl-val" id="vSig">15</span>
+        </div>
+        <div class="ctrl mp-morse">
+            <span class="ctrl-label">a (breedte)</span>
+            <input type="range" id="sMorseA" min="0.01" max="0.3" value="0.08" step="0.01">
+            <span class="ctrl-val" id="vMorseA">0.08</span>
+        </div>
+        <div class="ctrl mp-morse">
+            <span class="ctrl-label">D (diepte)</span>
+            <input type="range" id="sMorseD" min="0.5" max="5" value="2" step="0.1">
+            <span class="ctrl-val" id="vMorseD">2.0</span>
+        </div>
+        <div class="ctrl mp-yukawa">
+            <span class="ctrl-label">&mu; (afval)</span>
+            <input type="range" id="sYuMu" min="0.005" max="0.1" value="0.03" step="0.005">
+            <span class="ctrl-val" id="vYuMu">0.030</span>
+        </div>
+        <div class="ctrl mp-yukawa">
+            <span class="ctrl-label">g (sterkte)</span>
+            <input type="range" id="sYuG" min="0.5" max="10" value="3" step="0.5">
+            <span class="ctrl-val" id="vYuG">3.0</span>
+        </div>
+        <div class="ctrl mp-coulomb">
+            <span class="ctrl-label">&lambda; (scherm)</span>
+            <input type="range" id="sCouL" min="10" max="200" value="60" step="5">
+            <span class="ctrl-val" id="vCouL">60</span>
+        </div>
+        <div class="ctrl mp-coulomb">
+            <span class="ctrl-label">q (lading)</span>
+            <input type="range" id="sCouQ" min="0.5" max="8" value="3" step="0.5">
+            <span class="ctrl-val" id="vCouQ">3.0</span>
+        </div>
+        <div class="ctrl mp-vortex">
+            <span class="ctrl-label">&beta; (radiaal)</span>
+            <input type="range" id="sVortB" min="-5" max="5" value="1" step="0.5">
+            <span class="ctrl-val" id="vVortB">1.0</span>
+        </div>
+        <div class="ctrl mp-spring">
+            <span class="ctrl-label">k (stijfheid)</span>
+            <input type="range" id="sSprK" min="0.01" max="0.5" value="0.1" step="0.01">
+            <span class="ctrl-val" id="vSprK">0.10</span>
+        </div>
+        <div class="ctrl mp-spring">
+            <span class="ctrl-label">c (demper)</span>
+            <input type="range" id="sSprC" min="0.01" max="0.3" value="0.05" step="0.01">
+            <span class="ctrl-val" id="vSprC">0.05</span>
+        </div>
+    </div>
+
+    <!-- PRESETS -->
+    <div class="section">
+        <div class="section-head"><span class="dot"></span>Configuratie</div>
+        <select id="presetSel">
+            <option value="random">Willekeurig</option>
+            <option value="organisme">Organisme</option>
+            <option value="sterrenevel">Sterrenevel</option>
+            <option value="chaos">Chaos</option>
+            <option value="symbiose">Symbiose</option>
+            <option value="zwerm">Zwerm</option>
+            <option value="galaxie">Galaxie</option>
+            <option value="ecosysteem">Ecosysteem</option>
+            <option value="dna">DNA Spiraal</option>
+            <option value="supernova">Supernova</option>
+        </select>
+    </div>
+
+    <!-- PARAMETERS -->
+    <div class="section">
+        <div class="section-head"><span class="dot"></span>Parameters</div>
+        <div class="ctrl">
+            <span class="ctrl-label">N deeltjes</span>
+            <input type="range" id="sN" min="100" max="3000" value="600" step="100">
+            <span class="ctrl-val" id="vN">600</span>
+        </div>
+        <div class="ctrl">
+            <span class="ctrl-label">&Delta;t (snelheid)</span>
+            <input type="range" id="sDt" min="0.1" max="3" value="1" step="0.1">
+            <span class="ctrl-val" id="vDt">1.0</span>
+        </div>
+        <div class="ctrl">
+            <span class="ctrl-label">&gamma; (demping)</span>
+            <input type="range" id="sG" min="0.1" max="1" value="0.5" step="0.05">
+            <span class="ctrl-val" id="vG">0.50</span>
+        </div>
+        <div class="ctrl">
+            <span class="ctrl-label">r<sub>cut</sub> (bereik)</span>
+            <input type="range" id="sR" min="30" max="300" value="120" step="10">
+            <span class="ctrl-val" id="vR">120</span>
+        </div>
+        <div class="ctrl">
+            <span class="ctrl-label">Weergave r</span>
+            <input type="range" id="sSize" min="1" max="8" value="2.5" step="0.5">
+            <span class="ctrl-val" id="vSize">2.5</span>
+        </div>
+        <div class="ctrl">
+            <span class="ctrl-label">Trail &alpha;</span>
+            <input type="range" id="sTr" min="0" max="0.98" value="0.9" step="0.01">
+            <span class="ctrl-val" id="vTr">0.90</span>
+        </div>
+    </div>
+
+    <!-- OPTIES -->
+    <div class="section">
+        <div class="section-head"><span class="dot"></span>Visualisatie</div>
+        <div class="tog">
+            <span class="ctrl-label">Glow</span>
+            <label class="tog-switch"><input type="checkbox" id="tGlow" checked><span class="tog-track"></span></label>
+        </div>
+        <div class="tog">
+            <span class="ctrl-label">Verbindingen</span>
+            <label class="tog-switch"><input type="checkbox" id="tLines"><span class="tog-track"></span></label>
+        </div>
+        <div class="tog">
+            <span class="ctrl-label">Kleur op |v|</span>
+            <label class="tog-switch"><input type="checkbox" id="tHeat"><span class="tog-track"></span></label>
+        </div>
+        <div class="tog">
+            <span class="ctrl-label">Toroidal</span>
+            <label class="tog-switch"><input type="checkbox" id="tWrap"><span class="tog-track"></span></label>
+        </div>
+        <div class="tog">
+            <span class="ctrl-label">Auto-explore</span>
+            <label class="tog-switch"><input type="checkbox" id="tExpl"><span class="tog-track"></span></label>
+        </div>
+    </div>
+
+    <!-- LIVE STATS -->
+    <div class="section">
+        <div class="section-head"><span class="dot"></span>Live Analyse</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Temperatuur</div>
+                <div class="stat-val" id="statT">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Kin. Energie</div>
+                <div class="stat-val" id="statEk">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Entropie S</div>
+                <div class="stat-val" id="statS">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Clusters</div>
+                <div class="stat-val" id="statC">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="section">
+        <div class="section-head"><span class="dot"></span>Energieverloop</div>
+        <div class="chart-wrap">
+            <div class="chart-label"><span>E<sub>k</sub> kinetisch</span><b id="chartEkVal">0</b></div>
+            <canvas class="chart-canvas" id="chartEk"></canvas>
+        </div>
+        <div class="chart-wrap">
+            <div class="chart-label"><span>T temperatuur</span><b id="chartTVal">0</b></div>
+            <canvas class="chart-canvas" id="chartT"></canvas>
+        </div>
+    </div>
+
+    <!-- MATRIX -->
+    <div class="section">
+        <div class="section-head"><span class="dot"></span>Interactiematrix &alpha;<sub>ij</sub></div>
+        <div class="matrix" id="matrix"></div>
+    </div>
+
+    <!-- ACTIES -->
+    <div class="section">
+        <div class="section-head"><span class="dot"></span>Acties</div>
+        <div class="btn-row">
+            <button class="btn btn-glow" id="bRand">Randomize</button>
+            <button class="btn" id="bSym">Symmetrie</button>
+        </div>
+        <div class="btn-row">
+            <button class="btn" id="bPause">Pauze</button>
+            <button class="btn" id="bReset">Reset</button>
+        </div>
+        <div class="btn-row">
+            <button class="btn" id="bScreen">Screenshot</button>
+            <button class="btn" id="bShare">Delen</button>
+        </div>
+        <div class="btn-row">
+            <button class="btn" id="bCSV">Export CSV</button>
+            <button class="btn" id="bFS">Fullscreen</button>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="footer-brand"><a href="../">MyTagSpot</a> &middot; St&Delta;rD&uuml;st21</div>
+        <div class="footer-sub">WISKUNDIG MODEL &mdash; GEBOUWD MET CLAUDE OPUS 4.6</div>
+    </div>
+</aside>
+
+<script>
+(function() {
+'use strict';
+
+// ================================================================
+//  PARTICLE LIFE — Full Physics Lab
+//  6 wiskundige modellen: Lennard-Jones, Morse, Yukawa,
+//  Coulomb (afgeschermd), Vortex, Spring-Damper.
+//  Zero dependencies. Built with Claude Opus 4.6 (1M context).
+// ================================================================
+
+var currentModel = 'lennard-jones';
+
+var COLORS = ['#00e5ff','#ff2d78','#7cff2a','#ff9100','#b040ff','#ffe040'];
+var CRGB = [[0,229,255],[255,45,120],[124,255,42],[255,145,0],[176,64,255],[255,224,64]];
+var NC = COLORS.length;
+
+var bgC = document.getElementById('bgCanvas');
+var simC = document.getElementById('simCanvas');
+var fxC = document.getElementById('fxCanvas');
+var uiC = document.getElementById('uiCanvas');
+var bgX = bgC.getContext('2d');
+var simX = simC.getContext('2d');
+var fxX = fxC.getContext('2d');
+var uiX = uiC.getContext('2d');
+
+var P = [];          // particles [{x,y,vx,vy,c}]
+var R = [];          // rules NxN
+var paused = false;
+var fc = 0, ft = 0;
+var explT = 0;
+var mouse = { x:-1e4, y:-1e4, dn:false, rt:false, pulse:0 };
+
+// Energy history for charts
+var histEk = new Float32Array(200);
+var histT = new Float32Array(200);
+var histIdx = 0;
+
+// Live stats
+var liveEk = 0, liveT = 0, liveS = 0, liveClusters = 0;
+
+// Settings getters
+function gv(id) { return +document.getElementById(id).value; }
+function gc(id) { return document.getElementById(id).checked; }
+
+// Resize
+function resize() {
+    var pw = window.innerWidth > 840 ? 380 : 0;
+    var w = window.innerWidth - pw;
+    var h = window.innerHeight - 40;
+    [bgC,simC,fxC,uiC].forEach(function(c){ c.width=w; c.height=h; });
+    drawBg();
+
+    // Size chart canvases
+    var charts = document.querySelectorAll('.chart-canvas');
+    for (var i = 0; i < charts.length; i++) {
+        charts[i].width = charts[i].offsetWidth;
+        charts[i].height = 50;
+    }
+}
+window.addEventListener('resize', resize);
+
+// Background: subtle grid + vignette
+function drawBg() {
+    var w = bgC.width, h = bgC.height;
+    bgX.fillStyle = '#060610';
+    bgX.fillRect(0,0,w,h);
+
+    bgX.strokeStyle = 'rgba(255,255,255,0.012)';
+    bgX.lineWidth = 1;
+    var s = 50;
+    for (var x=0;x<w;x+=s) { bgX.beginPath(); bgX.moveTo(x,0); bgX.lineTo(x,h); bgX.stroke(); }
+    for (var y=0;y<h;y+=s) { bgX.beginPath(); bgX.moveTo(0,y); bgX.lineTo(w,y); bgX.stroke(); }
+
+    var g = bgX.createRadialGradient(w/2,h/2,h*0.15,w/2,h/2,h*0.95);
+    g.addColorStop(0,'rgba(6,6,16,0)');
+    g.addColorStop(1,'rgba(6,6,16,0.7)');
+    bgX.fillStyle = g;
+    bgX.fillRect(0,0,w,h);
+}
+
+// Seeded random
+var seed = Math.floor(Math.random()*0xFFFFFFFF);
+function rng() {
+    seed += 0x6D2B79F5;
+    var t = seed;
+    t = Math.imul(t^(t>>>15),t|1);
+    t ^= t + Math.imul(t^(t>>>7),t|61);
+    return ((t^(t>>>14))>>>0)/4294967296;
+}
+
+// Rules
+function randomRules() {
+    R = [];
+    for (var i=0;i<NC;i++) { R[i]=[]; for (var j=0;j<NC;j++) R[i][j]=rng()*2-1; }
+    renderMatrix();
+}
+
+function symRules() {
+    for (var i=0;i<NC;i++) for (var j=0;j<i;j++) {
+        var a=(R[i][j]+R[j][i])/2; R[i][j]=R[j][i]=a;
+    }
+    renderMatrix();
+}
+
+// Presets are now in MODEL_PRESETS (defined below with model switching code)
+function loadPresetLegacy(n) {
+    // Legacy stub — actual loadPreset defined below
+    spawn();
+}
+
+// Spawn particles
+function spawn() {
+    P = [];
+    var n = gv('sN'), per = Math.floor(n/NC);
+    var w = simC.width, h = simC.height;
+    for (var c=0;c<NC;c++) for (var i=0;i<per;i++) {
+        P.push({ x:rng()*(w-60)+30, y:rng()*(h-60)+30, vx:0, vy:0, c:c });
+    }
+    simX.fillStyle='#060610'; simX.fillRect(0,0,w,h);
+    histEk.fill(0); histT.fill(0); histIdx=0;
+}
+
+// ── FORCE MODELS ──
+// Each returns a force magnitude (scalar). Direction is handled in physics().
+// alpha = interaction strength from matrix R[i][j]
+
+function forceLennardJones(alpha, d, sigma) {
+    var sr = sigma / d;
+    var sr3 = sr*sr*sr;
+    var sr6 = sr3*sr3;
+    return alpha * (sr6 - sr3) / d;
+}
+
+function forceMorse(alpha, d) {
+    var sigma = gv('sSig');
+    var a = gv('sMorseA');
+    var D = gv('sMorseD');
+    var ex = Math.exp(-a * (d - sigma));
+    return alpha * 2 * a * D * (1 - ex) * ex / d;
+}
+
+function forceYukawa(alpha, d) {
+    var mu = gv('sYuMu');
+    var g = gv('sYuG');
+    var emr = Math.exp(-mu * d);
+    return alpha * g * emr * (mu * d + 1) / (d * d);
+}
+
+function forceCoulomb(alpha, d) {
+    var lambda = gv('sCouL');
+    var q = gv('sCouQ');
+    var screen = Math.exp(-d / lambda);
+    return alpha * q * screen / (d * d);
+}
+
+function forceVortex(alpha, d, ddx, ddy) {
+    // Returns {fx, fy} directly — tangential + radial
+    var beta = gv('sVortB');
+    var invd = 1 / d;
+    // Unit vector from b to a
+    var ux = ddx * invd;
+    var uy = ddy * invd;
+    // Tangential (perpendicular): rotate 90 degrees
+    var tx = -uy;
+    var ty = ux;
+    // Radial force (attraction/repulsion) + tangential force (spin)
+    var fr = beta * invd * invd;  // radial
+    var ft = alpha * invd;        // tangential
+    return { fx: fr * ux + ft * tx, fy: fr * uy + ft * ty };
+}
+
+function forceSpring(alpha, d, vrad) {
+    var sigma = gv('sSig');
+    var k = gv('sSprK');
+    var c = gv('sSprC');
+    var displacement = d - sigma;
+    return alpha * (-k * displacement - c * vrad) / d;
+}
+
+// ── PHYSICS (multi-model) ──
+function physics() {
+    var rcut = gv('sR');
+    var rc2 = rcut*rcut;
+    var dt = gv('sDt');
+    var damp = 1 - gv('sG');
+    var sigma = gv('sSig');
+    var wrap = gc('tWrap');
+    var len = P.length;
+    var w = simC.width, h = simC.height;
+    var model = currentModel;
+
+    // Spatial hash
+    var cs = Math.max(rcut,1);
+    var cols = Math.ceil(w/cs)+1;
+    var grid = new Map();
+
+    for (var i=0;i<len;i++) {
+        var p = P[i];
+        var gk = Math.floor(p.y/cs)*cols + Math.floor(p.x/cs);
+        if (!grid.has(gk)) grid.set(gk,[]);
+        grid.get(gk).push(i);
+    }
+
+    var totalEk = 0;
+
+    for (var ii=0;ii<len;ii++) {
+        var a = P[ii];
+        var fx=0, fy=0;
+        var acx = Math.floor(a.x/cs);
+        var acy = Math.floor(a.y/cs);
+
+        for (var dy=-1;dy<=1;dy++) {
+            for (var dx=-1;dx<=1;dx++) {
+                var cell = grid.get((acy+dy)*cols+(acx+dx));
+                if (!cell) continue;
+                for (var ji=0;ji<cell.length;ji++) {
+                    var j = cell[ji];
+                    if (ii===j) continue;
+                    var b = P[j];
+
+                    var ddx = a.x-b.x;
+                    var ddy = a.y-b.y;
+
+                    if (wrap) {
+                        if (ddx > w/2) ddx -= w;
+                        else if (ddx < -w/2) ddx += w;
+                        if (ddy > h/2) ddy -= h;
+                        else if (ddy < -h/2) ddy += h;
+                    }
+
+                    var d2 = ddx*ddx + ddy*ddy;
+                    if (d2 <= 0 || d2 >= rc2) continue;
+
+                    var alpha = R[a.c][b.c];
+                    var d = Math.sqrt(d2);
+
+                    if (model === 'vortex') {
+                        var vf = forceVortex(alpha, d, ddx, ddy);
+                        fx += vf.fx;
+                        fy += vf.fy;
+                    } else {
+                        var F;
+                        switch(model) {
+                            case 'lennard-jones': F = forceLennardJones(alpha, d, sigma); break;
+                            case 'morse': F = forceMorse(alpha, d); break;
+                            case 'yukawa': F = forceYukawa(alpha, d); break;
+                            case 'coulomb': F = forceCoulomb(alpha, d); break;
+                            case 'spring':
+                                var vrad = ((a.vx-b.vx)*ddx + (a.vy-b.vy)*ddy) / d;
+                                F = forceSpring(alpha, d, vrad);
+                                break;
+                            default: F = forceLennardJones(alpha, d, sigma);
+                        }
+                        fx += F * ddx;
+                        fy += F * ddy;
+                    }
+                }
+            }
+        }
+
+        // Mouse forces
+        if (mouse.dn || mouse.rt) {
+            var mdx=a.x-mouse.x, mdy=a.y-mouse.y;
+            var md2=mdx*mdx+mdy*mdy;
+            if (md2>0 && md2<40000) {
+                var md=Math.sqrt(md2);
+                var mf=(mouse.rt?3:-3)/md;
+                fx+=mf*mdx; fy+=mf*mdy;
+            }
+        }
+        if (mouse.pulse!==0) {
+            var px=a.x-mouse.x, py=a.y-mouse.y;
+            var pd=px*px+py*py;
+            if (pd>0&&pd<90000) { var pf=mouse.pulse*2/Math.sqrt(pd); fx+=pf*px; fy+=pf*py; }
+        }
+
+        a.vx = a.vx*damp + fx*dt;
+        a.vy = a.vy*damp + fy*dt;
+    }
+
+    // Update positions + calc energy
+    for (var k=0;k<len;k++) {
+        var pp = P[k];
+        pp.x += pp.vx;
+        pp.y += pp.vy;
+
+        if (wrap) {
+            if (pp.x<0) pp.x+=w; else if (pp.x>=w) pp.x-=w;
+            if (pp.y<0) pp.y+=h; else if (pp.y>=h) pp.y-=h;
+        } else {
+            if (pp.x<0){pp.x=-pp.x;pp.vx*=-1;}
+            if (pp.x>=w){pp.x=2*w-pp.x;pp.vx*=-1;}
+            if (pp.y<0){pp.y=-pp.y;pp.vy*=-1;}
+            if (pp.y>=h){pp.y=2*h-pp.y;pp.vy*=-1;}
+        }
+
+        totalEk += pp.vx*pp.vx + pp.vy*pp.vy;
+    }
+
+    // Stats
+    liveEk = totalEk * 0.5;
+    liveT = len > 0 ? totalEk / len : 0;
+
+    // Spatial entropy
+    var eGridSize = 8;
+    var eCounts = new Float32Array(eGridSize*eGridSize);
+    for (var ei=0;ei<len;ei++) {
+        var ex = Math.min(Math.floor(P[ei].x/(w/eGridSize)), eGridSize-1);
+        var ey = Math.min(Math.floor(P[ei].y/(h/eGridSize)), eGridSize-1);
+        if (ex>=0 && ey>=0) eCounts[ey*eGridSize+ex]++;
+    }
+    var entropy = 0;
+    for (var si=0;si<eCounts.length;si++) {
+        if (eCounts[si]>0) {
+            var prob = eCounts[si]/len;
+            entropy -= prob * Math.log2(prob);
+        }
+    }
+    liveS = entropy;
+
+    liveClusters = countClusters();
+
+    histEk[histIdx % 200] = liveEk;
+    histT[histIdx % 200] = liveT;
+    histIdx++;
+
+    if (mouse.pulse!==0) { mouse.pulse*=0.85; if(Math.abs(mouse.pulse)<0.01) mouse.pulse=0; }
+}
+
+// Cluster detection (simple: count groups based on proximity)
+function countClusters() {
+    var len = P.length;
+    if (len === 0) return 0;
+    var visited = new Uint8Array(len);
+    var clusters = 0;
+    var threshold = 30;
+    var t2 = threshold * threshold;
+
+    for (var i = 0; i < len; i++) {
+        if (visited[i]) continue;
+        clusters++;
+        // BFS
+        var queue = [i];
+        visited[i] = 1;
+        while (queue.length > 0) {
+            var cur = queue.pop();
+            var a = P[cur];
+            // Only check nearby particles (subsample for perf)
+            for (var j = 0; j < len; j += 3) {
+                if (visited[j]) continue;
+                var dx = a.x - P[j].x;
+                var dy = a.y - P[j].y;
+                if (dx*dx + dy*dy < t2) {
+                    visited[j] = 1;
+                    queue.push(j);
+                }
+            }
+        }
+    }
+    return clusters;
+}
+
+// Auto-explore
+function autoExplore() {
+    explT++;
+    if (explT < 150) return;
+    explT = 0;
+    var c1 = Math.floor(rng()*NC);
+    var c2 = Math.floor(rng()*NC);
+    R[c1][c2] = R[c1][c2]*0.6 + (rng()*2-1)*0.4;
+    renderMatrix();
+}
+
+// ── RENDERING ──
+function render() {
+    var w = simC.width, h = simC.height;
+    var size = gv('sSize');
+    var showGlow = gc('tGlow');
+    var showLines = gc('tLines');
+    var showHeat = gc('tHeat');
+
+    // Trail
+    var ta = 1 - gv('sTr');
+    simX.fillStyle = 'rgba(6,6,16,' + ta + ')';
+    simX.fillRect(0,0,w,h);
+
+    fxX.clearRect(0,0,w,h);
+
+    // Connections
+    if (showLines) {
+        var cr2 = 2500;
+        simX.lineWidth = 0.4;
+        for (var li=0;li<P.length;li+=2) {
+            var la = P[li];
+            for (var lj=li+1;lj<P.length;lj+=2) {
+                var lb = P[lj];
+                if (la.c!==lb.c) continue;
+                var ldx=la.x-lb.x, ldy=la.y-lb.y;
+                if (ldx*ldx+ldy*ldy<cr2) {
+                    simX.globalAlpha = 0.12;
+                    simX.strokeStyle = COLORS[la.c];
+                    simX.beginPath();
+                    simX.moveTo(la.x,la.y);
+                    simX.lineTo(lb.x,lb.y);
+                    simX.stroke();
+                }
+            }
+        }
+        simX.globalAlpha = 1;
+    }
+
+    // Particles
+    for (var pi=0;pi<P.length;pi++) {
+        var pp = P[pi];
+        var vel = Math.sqrt(pp.vx*pp.vx + pp.vy*pp.vy);
+
+        if (showHeat) {
+            // Heatmap: slow=blue, fast=red
+            var hue = Math.max(0, 240 - vel * 40);
+            simX.fillStyle = 'hsl(' + hue + ',100%,60%)';
+        } else {
+            simX.fillStyle = COLORS[pp.c];
+        }
+
+        simX.beginPath();
+        simX.arc(pp.x, pp.y, size, 0, 6.2832);
+        simX.fill();
+
+        // Hot core for fast particles
+        if (vel > 2) {
+            simX.globalAlpha = Math.min(vel*0.1, 0.5);
+            simX.fillStyle = '#fff';
+            simX.beginPath();
+            simX.arc(pp.x, pp.y, size*0.5, 0, 6.2832);
+            simX.fill();
+            simX.globalAlpha = 1;
+        }
+    }
+
+    // Glow layer
+    if (showGlow) {
+        fxX.globalCompositeOperation = 'lighter';
+        for (var gi=0;gi<P.length;gi+=2) {
+            var gp = P[gi];
+            var gv2 = Math.sqrt(gp.vx*gp.vx+gp.vy*gp.vy);
+            var gs = size*3 + gv2*0.4;
+            var ga = 0.04 + Math.min(gv2*0.015, 0.1);
+            var rgb = CRGB[gp.c];
+            var gr = fxX.createRadialGradient(gp.x,gp.y,0,gp.x,gp.y,gs);
+            gr.addColorStop(0,'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+ga+')');
+            gr.addColorStop(1,'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0)');
+            fxX.fillStyle = gr;
+            fxX.fillRect(gp.x-gs,gp.y-gs,gs*2,gs*2);
+        }
+        fxX.globalCompositeOperation = 'source-over';
+    }
+
+    // Mouse indicator
+    uiX.clearRect(0,0,w,h);
+    if (mouse.dn||mouse.rt) {
+        var mc = mouse.rt ? 'rgba(255,45,120,' : 'rgba(0,229,255,';
+        var mg = uiX.createRadialGradient(mouse.x,mouse.y,0,mouse.x,mouse.y,200);
+        mg.addColorStop(0, mc+'0.12)');
+        mg.addColorStop(1, 'transparent');
+        uiX.fillStyle = mg;
+        uiX.beginPath(); uiX.arc(mouse.x,mouse.y,200,0,6.2832); uiX.fill();
+        uiX.strokeStyle = mc+'0.25)';
+        uiX.lineWidth = 1;
+        uiX.beginPath(); uiX.arc(mouse.x,mouse.y,200,0,6.2832); uiX.stroke();
+    }
+}
+
+// ── CHARTS ──
+function drawChart(canvasId, data, color, valId) {
+    var cv = document.getElementById(canvasId);
+    var cx = cv.getContext('2d');
+    var w = cv.width, h = cv.height;
+    cx.fillStyle = 'rgba(6,6,16,0.95)';
+    cx.fillRect(0,0,w,h);
+
+    // Find range
+    var max = 0.001;
+    for (var i=0;i<200;i++) { var v=data[(histIdx+i)%200]; if(v>max)max=v; }
+
+    // Draw
+    cx.strokeStyle = color;
+    cx.lineWidth = 1.5;
+    cx.beginPath();
+    for (var j=0;j<200;j++) {
+        var val = data[(histIdx+j)%200];
+        var x = (j/199)*w;
+        var y = h - (val/max)*(h-4) - 2;
+        if (j===0) cx.moveTo(x,y); else cx.lineTo(x,y);
+    }
+    cx.stroke();
+
+    // Fill under
+    cx.lineTo(w,h); cx.lineTo(0,h); cx.closePath();
+    cx.fillStyle = color.replace('1)','0.08)');
+    cx.fill();
+
+    // Current value
+    var cur = data[(histIdx-1+200)%200];
+    document.getElementById(valId).textContent = cur.toFixed(1);
+}
+
+// ── UPDATE STATS UI ──
+function updateStats() {
+    document.getElementById('statT').textContent = liveT.toFixed(2);
+    document.getElementById('statEk').textContent = liveEk.toFixed(0);
+    document.getElementById('statS').textContent = liveS.toFixed(2);
+    document.getElementById('statC').textContent = liveClusters;
+}
+
+// ── MAIN LOOP ──
+function loop(time) {
+    requestAnimationFrame(loop);
+
+    if (!paused) {
+        physics();
+        if (gc('tExpl')) autoExplore();
+    }
+    render();
+
+    fc++;
+    if (time-ft>=500) {
+        var fps = Math.round(fc*1000/(time-ft));
+        document.getElementById('hFps').textContent = fps+' fps';
+        document.getElementById('hStat1').textContent = P.length+' N';
+        document.getElementById('hStat2').textContent = 'T='+liveT.toFixed(1)+' S='+liveS.toFixed(1);
+        updateStats();
+        drawChart('chartEk', histEk, 'rgba(0,229,255,1)', 'chartEkVal');
+        drawChart('chartT', histT, 'rgba(255,224,64,1)', 'chartTVal');
+        fc=0; ft=time;
+    }
+}
+
+// ── MATRIX UI ──
+function mkDot(c) {
+    var d = document.createElement('div');
+    d.className = 'cdot';
+    d.style.background = c;
+    d.style.color = c;
+    return d;
+}
+
+function renderMatrix() {
+    var c = document.getElementById('matrix');
+    while (c.firstChild) c.removeChild(c.firstChild);
+
+    var hr = document.createElement('div');
+    hr.className = 'matrix-hdr';
+    for (var hj=0;hj<NC;hj++) {
+        var hc = document.createElement('div');
+        hc.className = 'matrix-hdr-cell';
+        hc.appendChild(mkDot(COLORS[hj]));
+        hr.appendChild(hc);
+    }
+    c.appendChild(hr);
+
+    for (var mi=0;mi<NC;mi++) {
+        var row = document.createElement('div');
+        row.className = 'matrix-row';
+        var rl = document.createElement('div');
+        rl.className = 'matrix-rl';
+        rl.appendChild(mkDot(COLORS[mi]));
+        row.appendChild(rl);
+
+        for (var mj=0;mj<NC;mj++) {
+            var cell = document.createElement('div');
+            cell.className = 'matrix-cell';
+            cell.dataset.i = mi;
+            cell.dataset.j = mj;
+            styleCell(cell, R[mi][mj]);
+            cell.addEventListener('click', cellClick);
+            cell.addEventListener('contextmenu', cellRight);
+            row.appendChild(cell);
+        }
+        c.appendChild(row);
+    }
+}
+
+function cellClick(e) {
+    var i=+e.currentTarget.dataset.i, j=+e.currentTarget.dataset.j;
+    R[i][j]=Math.round((R[i][j]+0.2)*100)/100;
+    if(R[i][j]>1) R[i][j]=-1;
+    styleCell(e.currentTarget, R[i][j]);
+}
+
+function cellRight(e) {
+    e.preventDefault();
+    var i=+e.currentTarget.dataset.i, j=+e.currentTarget.dataset.j;
+    R[i][j]=Math.round((R[i][j]-0.2)*100)/100;
+    if(R[i][j]<-1) R[i][j]=1;
+    styleCell(e.currentTarget, R[i][j]);
+}
+
+function styleCell(el,v) {
+    v = Math.round(v*100)/100;
+    el.textContent = (v>0?'+':'')+v.toFixed(1);
+    if (v>0) {
+        el.style.background='rgba(76,255,138,'+(v*0.25)+')';
+        el.style.color='rgba(76,255,138,'+(0.5+v*0.5)+')';
+    } else if (v<0) {
+        var n=-v;
+        el.style.background='rgba(255,64,112,'+(n*0.25)+')';
+        el.style.color='rgba(255,64,112,'+(0.5+n*0.5)+')';
+    } else {
+        el.style.background='rgba(255,255,255,0.02)';
+        el.style.color='#333';
+    }
+}
+
+// ── MODEL SWITCHING ──
+var FORMULAS = {
+    'lennard-jones': {
+        label: 'Lennard-Jones Potentiaal',
+        html: 'F(r) = <span class="var-green">&alpha;</span><sub>ij</sub> &middot; [(<span class="var-yellow">&sigma;</span>/r)<sup>6</sup> &minus; (<span class="var-yellow">&sigma;</span>/r)<sup>3</sup>]<br><span class="var-green">&alpha;</span> = interactiesterkte &nbsp; <span class="var-yellow">&sigma;</span> = evenwichtsafstand'
+    },
+    'morse': {
+        label: 'Morse Potentiaal',
+        html: 'F(r) = <span class="var-green">&alpha;</span> &middot; 2<span class="var-red">a</span> &middot; <span class="var-yellow">D</span> &middot; (1&minus;e<sup>&minus;<span class="var-red">a</span>(r&minus;<span class="var-yellow">&sigma;</span>)</sup>) &middot; e<sup>&minus;<span class="var-red">a</span>(r&minus;<span class="var-yellow">&sigma;</span>)</sup><br><span class="var-red">a</span> = breedte &nbsp; <span class="var-yellow">D</span> = putdiepte &nbsp; <span class="var-yellow">&sigma;</span> = evenwicht'
+    },
+    'yukawa': {
+        label: 'Yukawa Potentiaal',
+        html: 'F(r) = <span class="var-green">&alpha;</span> &middot; <span class="var-yellow">g</span> &middot; e<sup>&minus;<span class="var-red">&mu;</span>r</sup> &middot; (<span class="var-red">&mu;</span>r+1) / r&sup2;<br><span class="var-red">&mu;</span> = afvalsnelheid &nbsp; <span class="var-yellow">g</span> = koppelsterkte'
+    },
+    'coulomb': {
+        label: 'Coulomb (Afgeschermd)',
+        html: 'F(r) = <span class="var-green">&alpha;</span> &middot; <span class="var-yellow">q</span> / r&sup2; &middot; e<sup>&minus;r/<span class="var-red">&lambda;</span></sup><br><span class="var-yellow">q</span> = lading &nbsp; <span class="var-red">&lambda;</span> = Debye-afschermlengte'
+    },
+    'vortex': {
+        label: 'Vortex Krachten',
+        html: 'F<sub>tang</sub> = <span class="var-green">&alpha;</span>/r &nbsp;&nbsp; F<sub>rad</sub> = <span class="var-red">&beta;</span>/r&sup2;<br>tangenti&euml;le + radiale kracht &rarr; draaikolken'
+    },
+    'spring': {
+        label: 'Spring-Damper',
+        html: 'F(r) = <span class="var-green">&alpha;</span> &middot; [&minus;<span class="var-yellow">k</span>(r&minus;<span class="var-yellow">&sigma;</span>) &minus; <span class="var-red">c</span> &middot; v<sub>rad</sub>]<br><span class="var-yellow">k</span> = stijfheid &nbsp; <span class="var-red">c</span> = demping &nbsp; <span class="var-yellow">&sigma;</span> = rustlengte'
+    }
+};
+
+function switchModel(model) {
+    currentModel = model;
+    var f = FORMULAS[model];
+    document.getElementById('formulaLabel').textContent = f.label;
+    document.getElementById('formulaText').innerHTML = f.html;
+    document.getElementById('modelParams').dataset.model = model;
+
+    // Update preset dropdown for model-specific presets
+    updatePresetDropdown();
+}
+
+// Model-specific presets
+var MODEL_PRESETS = {
+    'lennard-jones': {
+        random:null,
+        organisme:[[.4,-.2,.1,-.1,.05,-.05],[-.2,.3,-.15,.2,-.1,.1],[.1,-.15,.5,-.3,.2,-.15],[-.1,.2,-.3,.4,.15,-.2],[.05,-.1,.2,.15,.35,-.25],[-.05,.1,-.15,-.2,-.25,.45]],
+        sterrenevel:[[.08,.2,.15,.1,.12,.18],[.2,.08,.18,.15,.1,.12],[.15,.18,.08,.2,.15,.1],[.1,.15,.2,.08,.18,.15],[.12,.1,.15,.18,.08,.2],[.18,.12,.1,.15,.2,.08]],
+        chaos:[[.7,-.8,.6,-.7,.8,-.9],[-.6,.8,-.7,.5,-.8,.7],[.8,-.5,.7,-.8,.6,-.6],[-.7,.6,-.8,.9,-.5,.8],[.6,-.7,.5,-.6,.8,-.7],[-.8,.7,-.6,.7,-.9,.6]],
+        symbiose:[[.5,.6,-.4,-.4,.1,.1],[.6,.5,-.4,-.4,.1,.1],[-.4,-.4,.5,.6,-.1,-.1],[-.4,-.4,.6,.5,-.1,-.1],[.1,.1,-.1,-.1,.5,.6],[.1,.1,-.1,-.1,.6,.5]],
+        zwerm:[[0,.35,.35,.35,.35,.35],[-.35,0,.35,.35,.35,.35],[-.35,-.35,0,.35,.35,.35],[-.35,-.35,-.35,0,.35,.35],[-.35,-.35,-.35,-.35,0,.35],[-.35,-.35,-.35,-.35,-.35,0]],
+        galaxie:[[.1,.5,0,0,-.3,.2],[-.5,.1,.5,0,0,-.3],[0,-.5,.1,.5,0,0],[0,0,-.5,.1,.5,0],[.3,0,0,-.5,.1,.5],[-.2,.3,0,0,-.5,.1]],
+        dna:[[0,.8,-.3,0,0,0],[.8,0,0,-.3,0,0],[-.3,0,0,.8,0,0],[0,-.3,.8,0,0,0],[0,0,0,0,.3,-.3],[0,0,0,0,-.3,.3]],
+        supernova:[[-.1,-.1,-.1,-.1,-.1,1],[-.1,-.1,-.1,-.1,-.1,1],[-.1,-.1,-.1,-.1,-.1,1],[-.1,-.1,-.1,-.1,-.1,1],[-.1,-.1,-.1,-.1,-.1,1],[.8,.8,.8,.8,.8,-.5]]
+    },
+    'morse': {
+        random:null,
+        celdeling:[[.6,-.3,.1,0,0,0],[-.3,.6,0,.1,0,0],[.1,0,.6,-.3,0,0],[0,.1,-.3,.6,0,0],[0,0,0,0,.5,-.2],[0,0,0,0,-.2,.5]],
+        bellen:[[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3]],
+        membraan:[[.8,-.5,0,0,0,0],[-.5,.8,-.5,0,0,0],[0,-.5,.8,-.5,0,0],[0,0,-.5,.8,-.5,0],[0,0,0,-.5,.8,-.5],[0,0,0,0,-.5,.8]],
+        pulseren:[[.2,.7,-.3,0,.1,0],[-.7,.2,.7,-.3,0,.1],[.3,-.7,.2,.7,-.3,0],[0,.3,-.7,.2,.7,-.3],[-.1,0,.3,-.7,.2,.7],[0,-.1,0,.3,-.7,.2]]
+    },
+    'yukawa': {
+        random:null,
+        clustering:[[.5,-.2,-.2,-.2,-.2,-.2],[-.2,.5,-.2,-.2,-.2,-.2],[-.2,-.2,.5,-.2,-.2,-.2],[-.2,-.2,-.2,.5,-.2,-.2],[-.2,-.2,-.2,-.2,.5,-.2],[-.2,-.2,-.2,-.2,-.2,.5]],
+        nucleair:[[.9,.3,0,0,0,-.5],[.3,.9,.3,0,0,0],[0,.3,.9,.3,0,0],[0,0,.3,.9,.3,0],[0,0,0,.3,.9,.3],[-.5,0,0,0,.3,.9]],
+        nevel:[[.15,.15,.15,.15,.15,.15],[.15,.15,.15,.15,.15,.15],[.15,.15,.15,.15,.15,.15],[.15,.15,.15,.15,.15,.15],[.15,.15,.15,.15,.15,.15],[.15,.15,.15,.15,.15,.15]],
+        atomen:[[.8,-.6,.2,0,0,0],[-.6,.8,-.6,.2,0,0],[.2,-.6,.8,-.6,0,0],[0,.2,-.6,.8,-.6,0],[0,0,0,-.6,.8,-.6],[0,0,0,0,-.6,.8]]
+    },
+    'coulomb': {
+        random:null,
+        plasma:[[-.3,.5,-.5,.5,-.5,.5],[.5,-.3,.5,-.5,.5,-.5],[-.5,.5,-.3,.5,-.5,.5],[.5,-.5,.5,-.3,.5,-.5],[-.5,.5,-.5,.5,-.3,.5],[.5,-.5,.5,-.5,.5,-.3]],
+        bliksem:[[0,.9,0,0,0,-.9],[-.9,0,.9,0,0,0],[0,-.9,0,.9,0,0],[0,0,-.9,0,.9,0],[0,0,0,-.9,0,.9],[.9,0,0,0,-.9,0]],
+        vonken:[[-.5,.8,.8,.8,.8,.8],[.8,-.5,.8,.8,.8,.8],[.8,.8,-.5,.8,.8,.8],[.8,.8,.8,-.5,.8,.8],[.8,.8,.8,.8,-.5,.8],[.8,.8,.8,.8,.8,-.5]],
+        aurora:[[.1,.4,-.2,.1,-.4,.2],[-.4,.1,.4,-.2,.1,-.4],[.2,-.4,.1,.4,-.2,.1],[-.2,.2,-.4,.1,.4,-.2],[.4,-.2,.2,-.4,.1,.4],[-.1,.4,-.2,.2,-.4,.1]]
+    },
+    'vortex': {
+        random:null,
+        spiraal:[[0,.5,0,0,0,-.5],[-.5,0,.5,0,0,0],[0,-.5,0,.5,0,0],[0,0,-.5,0,.5,0],[0,0,0,-.5,0,.5],[.5,0,0,0,-.5,0]],
+        draaikolk:[[.3,.6,.6,.6,.6,.6],[-.6,.3,.6,.6,.6,.6],[-.6,-.6,.3,.6,.6,.6],[-.6,-.6,-.6,.3,.6,.6],[-.6,-.6,-.6,-.6,.3,.6],[-.6,-.6,-.6,-.6,-.6,.3]],
+        melkweg:[[.1,.3,-.1,0,.2,-.2],[-.3,.1,.3,-.1,0,.2],[.1,-.3,.1,.3,-.1,0],[0,.1,-.3,.1,.3,-.1],[-.2,0,.1,-.3,.1,.3],[.2,-.2,0,.1,-.3,.1]],
+        tornado:[[0,.8,0,0,0,0],[0,0,.8,0,0,0],[0,0,0,.8,0,0],[0,0,0,0,.8,0],[0,0,0,0,0,.8],[.8,0,0,0,0,0]]
+    },
+    'spring': {
+        random:null,
+        weefsel:[[.5,.4,0,0,0,0],[.4,.5,.4,0,0,0],[0,.4,.5,.4,0,0],[0,0,.4,.5,.4,0],[0,0,0,.4,.5,.4],[0,0,0,0,.4,.5]],
+        elastiek:[[.8,-.3,.1,0,0,0],[-.3,.8,-.3,.1,0,0],[.1,-.3,.8,-.3,0,0],[0,.1,-.3,.8,-.3,0],[0,0,0,-.3,.8,-.3],[0,0,0,0,-.3,.8]],
+        trampoline:[[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3],[.3,.3,.3,.3,.3,.3]],
+        molecuul:[[.9,.7,-.5,0,0,0],[.7,.9,.7,-.5,0,0],[-.5,.7,.9,.7,0,0],[0,-.5,.7,.9,.7,0],[0,0,0,.7,.9,.7],[0,0,0,0,.7,.9]]
+    }
+};
+
+var PRESET_LABELS = {
+    random:'Willekeurig',organisme:'Organisme',sterrenevel:'Sterrenevel',chaos:'Chaos',
+    symbiose:'Symbiose',zwerm:'Zwerm',galaxie:'Galaxie',dna:'DNA Spiraal',supernova:'Supernova',
+    celdeling:'Celdeling',bellen:'Bellen',membraan:'Membraan',pulseren:'Pulseren',
+    clustering:'Clustering',nucleair:'Nucleair',nevel:'Nevel',atomen:'Atomen',
+    plasma:'Plasma',bliksem:'Bliksem',vonken:'Vonken',aurora:'Aurora',
+    spiraal:'Spiraal',draaikolk:'Draaikolk',melkweg:'Melkweg',tornado:'Tornado',
+    weefsel:'Weefsel',elastiek:'Elastiek',trampoline:'Trampoline',molecuul:'Molecuul'
+};
+
+function updatePresetDropdown() {
+    var sel = document.getElementById('presetSel');
+    while (sel.firstChild) sel.removeChild(sel.firstChild);
+    var presets = MODEL_PRESETS[currentModel] || MODEL_PRESETS['lennard-jones'];
+    for (var key in presets) {
+        var opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = PRESET_LABELS[key] || key;
+        sel.appendChild(opt);
+    }
+}
+
+// Override loadPreset to use model-specific presets
+function loadPreset(n) {
+    var presets = MODEL_PRESETS[currentModel] || MODEL_PRESETS['lennard-jones'];
+    if (n==='random'||!presets[n]) { seed=Math.floor(Math.random()*0xFFFFFFFF); randomRules(); }
+    else { R=presets[n].map(function(r){return r.slice();}); renderMatrix(); }
+    spawn();
+}
+
+// ── SLIDER BINDINGS ──
+function bindS(sid,vid,d) {
+    var el=document.getElementById(sid);
+    if (!el) return;
+    var v=document.getElementById(vid);
+    el.addEventListener('input',function(){v.textContent=parseFloat(el.value).toFixed(d);});
+}
+bindS('sN','vN',0); bindS('sDt','vDt',1); bindS('sG','vG',2);
+bindS('sR','vR',0); bindS('sSig','vSig',0); bindS('sSize','vSize',1); bindS('sTr','vTr',2);
+bindS('sMorseA','vMorseA',2); bindS('sMorseD','vMorseD',1);
+bindS('sYuMu','vYuMu',3); bindS('sYuG','vYuG',1);
+bindS('sCouL','vCouL',0); bindS('sCouQ','vCouQ',1);
+bindS('sVortB','vVortB',1);
+bindS('sSprK','vSprK',2); bindS('sSprC','vSprC',2);
+
+document.getElementById('sN').addEventListener('change',function(){ spawn(); });
+
+// ── BUTTONS ──
+document.getElementById('modelSel').addEventListener('change',function(e){ switchModel(e.target.value); spawn(); });
+document.getElementById('presetSel').addEventListener('change',function(e){ loadPreset(e.target.value); });
+document.getElementById('bRand').addEventListener('click',function(){ seed=Math.floor(Math.random()*0xFFFFFFFF); randomRules(); spawn(); document.getElementById('presetSel').value='random'; });
+document.getElementById('bSym').addEventListener('click',function(){ symRules(); });
+document.getElementById('bPause').addEventListener('click',function(){ paused=!paused; document.getElementById('bPause').textContent=paused?'Play':'Pauze'; });
+document.getElementById('bReset').addEventListener('click',function(){ spawn(); });
+document.getElementById('bFS').addEventListener('click',function(){ if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){}); else document.exitFullscreen(); });
+
+// Screenshot
+document.getElementById('bScreen').addEventListener('click',function(){
+    var mc = document.createElement('canvas');
+    mc.width=simC.width; mc.height=simC.height;
+    var mx = mc.getContext('2d');
+    mx.drawImage(bgC,0,0); mx.drawImage(simC,0,0); mx.drawImage(fxC,0,0);
+    mx.font='11px "JetBrains Mono",monospace';
+    mx.fillStyle='rgba(255,255,255,0.25)';
+    mx.textAlign='right';
+    mx.fillText('Particle Life \u2014 MyTagSpot \u00B7 St\u0394rD\u00FCst21', mc.width-10, mc.height-10);
+    var a=document.createElement('a');
+    a.download='particle-life-'+Date.now()+'.png';
+    a.href=mc.toDataURL('image/png');
+    a.click();
+});
+
+// Share
+document.getElementById('bShare').addEventListener('click',function(){
+    var cfg={r:R.map(function(row){return row.map(function(v){return Math.round(v*100);});}),s:seed,m:currentModel};
+    var url=window.location.origin+window.location.pathname+'#'+btoa(JSON.stringify(cfg));
+    if(navigator.clipboard) navigator.clipboard.writeText(url);
+    var b=document.getElementById('bShare'); b.textContent='Gekopieerd!';
+    setTimeout(function(){b.textContent='Delen';},2000);
+});
+
+// CSV export
+document.getElementById('bCSV').addEventListener('click',function(){
+    var lines = ['x,y,vx,vy,type,speed'];
+    for (var i=0;i<P.length;i++) {
+        var p=P[i];
+        var spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
+        lines.push(p.x.toFixed(2)+','+p.y.toFixed(2)+','+p.vx.toFixed(4)+','+p.vy.toFixed(4)+','+p.c+','+spd.toFixed(4));
+    }
+    var blob = new Blob([lines.join('\n')], {type:'text/csv'});
+    var a=document.createElement('a');
+    a.download='particle-life-data-'+Date.now()+'.csv';
+    a.href=URL.createObjectURL(blob);
+    a.click();
+    URL.revokeObjectURL(a.href);
+});
+
+// Load from hash
+function loadHash() {
+    var h=window.location.hash;
+    if (h&&h.length>1) {
+        try {
+            var d=JSON.parse(atob(h.substring(1)));
+            if (d.r&&d.r.length===NC) {
+                R=d.r.map(function(row){return row.map(function(v){return v/100;});});
+                if (d.s) seed=d.s;
+                if (d.m) { currentModel=d.m; document.getElementById('modelSel').value=d.m; switchModel(d.m); }
+                renderMatrix();
+                return true;
+            }
+        } catch(e){}
+    }
+    return false;
+}
+
+// ── MOUSE ──
+simC.addEventListener('mousemove',function(e){ var r=simC.getBoundingClientRect(); mouse.x=e.clientX-r.left; mouse.y=e.clientY-r.top; });
+simC.addEventListener('mousedown',function(e){ if(e.button===0) mouse.dn=true; if(e.button===2) mouse.rt=true; });
+simC.addEventListener('mouseup',function(e){ if(e.button===0) mouse.dn=false; if(e.button===2) mouse.rt=false; });
+simC.addEventListener('mouseleave',function(){ mouse.dn=false; mouse.rt=false; });
+simC.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+simC.addEventListener('wheel',function(e){ e.preventDefault(); mouse.pulse+=e.deltaY>0?1.5:-1.5; },{passive:false});
+
+// Touch
+simC.addEventListener('touchstart',function(e){ e.preventDefault(); var t=e.touches[0]; var r=simC.getBoundingClientRect(); mouse.x=t.clientX-r.left; mouse.y=t.clientY-r.top; mouse.dn=true; },{passive:false});
+simC.addEventListener('touchmove',function(e){ e.preventDefault(); var t=e.touches[0]; var r=simC.getBoundingClientRect(); mouse.x=t.clientX-r.left; mouse.y=t.clientY-r.top; },{passive:false});
+simC.addEventListener('touchend',function(){ mouse.dn=false; });
+
+// Mobile menu
+document.getElementById('menuBtn').addEventListener('click',function(){ document.getElementById('panel').classList.toggle('open'); document.getElementById('ov').classList.toggle('vis'); });
+document.getElementById('ov').addEventListener('click',function(){ document.getElementById('panel').classList.remove('open'); document.getElementById('ov').classList.remove('vis'); });
+
+// Keyboard
+document.addEventListener('keydown',function(e){
+    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+    switch(e.key){
+        case ' ': e.preventDefault(); paused=!paused; document.getElementById('bPause').textContent=paused?'Play':'Pauze'; break;
+        case 'r': seed=Math.floor(Math.random()*0xFFFFFFFF); randomRules(); spawn(); break;
+        case 'f': if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){}); else document.exitFullscreen(); break;
+        case 'g': var gt=document.getElementById('tGlow'); gt.checked=!gt.checked; break;
+        case 'h': var ht=document.getElementById('tHeat'); ht.checked=!ht.checked; break;
+    }
+});
+
+// ── INIT ──
+resize();
+switchModel('lennard-jones');
+if (!loadHash()) randomRules();
+spawn();
+requestAnimationFrame(loop);
+
+})();
+</script>
+
+</body>
+</html>
