@@ -722,6 +722,12 @@
 
 var currentModel = 'lennard-jones';
 
+// Stabiliteit: zonder deze grenzen kan een kracht als (sigma/r)^6 bij
+// bijna-botsende deeltjes astronomisch groot worden en "ontploft" de simulatie.
+var MIN_DIST = 2;        // kleinste afstand (px) die in de krachtformules gebruikt wordt
+var MAX_SPEED = 10;      // maximale snelheid (px per frame)
+var MAX_SPEED2 = MAX_SPEED * MAX_SPEED;
+
 var COLORS = ['#00e5ff','#ff2d78','#7cff2a','#ff9100','#b040ff','#ffe040'];
 var CRGB = [[0,229,255],[255,45,120],[124,255,42],[255,145,0],[176,64,255],[255,224,64]];
 var NC = COLORS.length;
@@ -835,6 +841,17 @@ function spawn() {
 // ── FORCE MODELS ──
 // Each returns a force magnitude (scalar). Direction is handled in physics().
 // alpha = interaction strength from matrix R[i][j]
+// mp = model parameters, read once per frame by readModelParams()
+// (reading the sliders per particle pair would cost millions of DOM lookups per frame)
+var mp = {};
+function readModelParams() {
+    mp.sigma = gv('sSig');
+    mp.morseA = gv('sMorseA'); mp.morseD = gv('sMorseD');
+    mp.yuMu = gv('sYuMu');     mp.yuG = gv('sYuG');
+    mp.couL = gv('sCouL');     mp.couQ = gv('sCouQ');
+    mp.vortB = gv('sVortB');
+    mp.sprK = gv('sSprK');     mp.sprC = gv('sSprC');
+}
 
 function forceLennardJones(alpha, d, sigma) {
     var sr = sigma / d;
@@ -844,30 +861,30 @@ function forceLennardJones(alpha, d, sigma) {
 }
 
 function forceMorse(alpha, d) {
-    var sigma = gv('sSig');
-    var a = gv('sMorseA');
-    var D = gv('sMorseD');
+    var sigma = mp.sigma;
+    var a = mp.morseA;
+    var D = mp.morseD;
     var ex = Math.exp(-a * (d - sigma));
     return alpha * 2 * a * D * (1 - ex) * ex / d;
 }
 
 function forceYukawa(alpha, d) {
-    var mu = gv('sYuMu');
-    var g = gv('sYuG');
+    var mu = mp.yuMu;
+    var g = mp.yuG;
     var emr = Math.exp(-mu * d);
     return alpha * g * emr * (mu * d + 1) / (d * d);
 }
 
 function forceCoulomb(alpha, d) {
-    var lambda = gv('sCouL');
-    var q = gv('sCouQ');
+    var lambda = mp.couL;
+    var q = mp.couQ;
     var screen = Math.exp(-d / lambda);
     return alpha * q * screen / (d * d);
 }
 
 function forceVortex(alpha, d, ddx, ddy) {
     // Returns {fx, fy} directly — tangential + radial
-    var beta = gv('sVortB');
+    var beta = mp.vortB;
     var invd = 1 / d;
     // Unit vector from b to a
     var ux = ddx * invd;
@@ -882,9 +899,9 @@ function forceVortex(alpha, d, ddx, ddy) {
 }
 
 function forceSpring(alpha, d, vrad) {
-    var sigma = gv('sSig');
-    var k = gv('sSprK');
-    var c = gv('sSprC');
+    var sigma = mp.sigma;
+    var k = mp.sprK;
+    var c = mp.sprC;
     var displacement = d - sigma;
     return alpha * (-k * displacement - c * vrad) / d;
 }
@@ -895,7 +912,8 @@ function physics() {
     var rc2 = rcut*rcut;
     var dt = gv('sDt');
     var damp = 1 - gv('sG');
-    var sigma = gv('sSig');
+    readModelParams();
+    var sigma = mp.sigma;
     var wrap = gc('tWrap');
     var len = P.length;
     var w = simC.width, h = simC.height;
@@ -944,7 +962,7 @@ function physics() {
                     if (d2 <= 0 || d2 >= rc2) continue;
 
                     var alpha = R[a.c][b.c];
-                    var d = Math.sqrt(d2);
+                    var d = Math.max(Math.sqrt(d2), MIN_DIST);
 
                     if (model === 'vortex') {
                         var vf = forceVortex(alpha, d, ddx, ddy);
@@ -988,6 +1006,17 @@ function physics() {
 
         a.vx = a.vx*damp + fx*dt;
         a.vy = a.vy*damp + fy*dt;
+
+        // Snelheidslimiet (vangt ook NaN/Infinity op)
+        var v2 = a.vx*a.vx + a.vy*a.vy;
+        if (!(v2 <= MAX_SPEED2)) {
+            if (isFinite(v2)) {
+                var sc = MAX_SPEED / Math.sqrt(v2);
+                a.vx *= sc; a.vy *= sc;
+            } else {
+                a.vx = 0; a.vy = 0;
+            }
+        }
     }
 
     // Update positions + calc energy
@@ -1029,8 +1058,6 @@ function physics() {
         }
     }
     liveS = entropy;
-
-    liveClusters = countClusters();
 
     histEk[histIdx % 200] = liveEk;
     histT[histIdx % 200] = liveT;
@@ -1240,6 +1267,7 @@ function loop(time) {
         document.getElementById('hFps').textContent = fps+' fps';
         document.getElementById('hStat1').textContent = P.length+' N';
         document.getElementById('hStat2').textContent = 'T='+liveT.toFixed(1)+' S='+liveS.toFixed(1);
+        liveClusters = countClusters();   // duur (O(n^2)), dus enkel bij het verversen van de stats
         updateStats();
         drawChart('chartEk', histEk, 'rgba(0,229,255,1)', 'chartEkVal');
         drawChart('chartT', histT, 'rgba(255,224,64,1)', 'chartTVal');
